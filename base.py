@@ -5,6 +5,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn import tree
 from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from matplotlib import pyplot
 
 import os
 import os.path
@@ -72,13 +74,38 @@ attricol = ['age', 'bmi', 'elective_surgery', 'gender', 'height',
        'icu_type_CTICU', 'icu_type_Cardiac ICU', 'icu_type_MICU',
        'icu_type_Med-Surg ICU', 'icu_type_Neuro ICU', 'icu_type_SICU']
 std = pd.DataFrame(data=std, columns= attricol)
-final = pd.concat([std, pd.DataFrame(columns=['hospital_death'])])
-final['hospital_death'] = df['hospital_death']
+atop = pd.concat([std, pd.DataFrame(columns=['hospital_death'])])
+atop['hospital_death'] = df['hospital_death']
 
+## v0.4 show attributs' importance
+# atopdata, atoptarget = atop.loc[:, atop.columns != 'hospital_death'], atop.loc[:, atop.columns == 'hospital_death']
+# names = std.columns
+# rf=RandomForestClassifier()
+# rf.fit(atopdata, atoptarget)
+# atopimportance = rf.feature_importances_
+# for k,l in enumerate(atopimportance):
+#        print('Feature: %0d, Score: %.5f' % (k, l))
+# pyplot.bar([x for x in range(len(atopimportance))], atopimportance)
+# pyplot.show()
+# # print("Features sorted by their score:")
+# # print(sorted(zip(map(lambda x:round(x,4),rf.feature_importances_),names)))
 
+## v0.5 remove attributs with importance<0.01
+temp1 = [x for x in range(atop.shape[1])]
+temp2 = [2,3,9,10,13,16,33,53]
+temp3 = [x for x in range(65,95)]
+tempf = []
+for m in temp3:
+       temp2.append(m)
+# print(temp2)
+for n in temp1:
+       if n not in temp2:
+              tempf.append(n)
+print(tempf)
+atopdata = atop.iloc[:, tempf]
+atoptarget = atop.loc[:, atop.columns == 'hospital_death']
 
-
-
+# -----------------------------------------------------------------------------
 
 # features, targets = df.loc[:, df.columns != "hospital_death"], df.loc[:, df.columns == "hospital_death"]
 #
