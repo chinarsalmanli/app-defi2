@@ -4,43 +4,81 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn import tree
+from sklearn.preprocessing import StandardScaler
 
 import os
 import os.path
 
-## Replace ',' with '.'
-# f = open('./dataDefi2.csv')
-# content = f.read()
-# f.close()
-# t = content.replace(",",".")
-# with open("datanew.csv", "w") as f1:
-#     f1.write(t)
+df = pd.read_csv('dataDefi2.csv', sep=';')
 
-## v0.1, remove id and icu_stay_type = transfer
-# df = pd.read_csv('./datanew.csv', sep=";")
+## v0.1 Remove id
+delist = ['encounter_id', 'patient_id', 'hospital_id', 'icu_id', 'apache_3j_bodysystem', 'apache_2_bodysystem']
+df.drop(delist, axis=1, inplace=True)
+
+## v0.2 Replace ',' with '.'
+#print(df.columns)
+repvir = ['bmi', 'height', 'pre_icu_los_days', 'weight', 'apache_3j_diagnosis', 'temp_apache', 'd1_temp_max', 'd1_temp_min', 'd1_potassium_max', 'd1_potassium_min', 'apache_4a_hospital_death_prob', 'apache_4a_icu_death_prob']
+for i in repvir:
+    # if str(df[i]).find(',') != -1:
+    df[i] = df[i].str.replace(',', '.').astype('float')
+
+## v0.3 Clean and standardlize
+dummcol = ['ethnicity', 'icu_admit_source', 'icu_stay_type', 'icu_type']
+df = pd.get_dummies(data=df, columns=dummcol)
+df['gender'] = df['gender'].apply(lambda x: 0 if x=='F' else 1)
+# for j in df.columns.tolist():
+#     df[j].replace(to_replace=[None],value=np.nan,inplace=True)
+# df = df.groupby(df.columns, axis = 1).transform(lambda x: x.fillna(x.mean()))
+for j in df.columns.tolist():
+    df[j] = pd.to_numeric(df[j], errors='coerce')
+for column in list(df.columns[df.isnull().sum() > 0]):
+    mean_val = df[column].mean()
+    df[column].fillna(mean_val, inplace=True)
+
 # print(df.columns)
-# delist = ['encounter_id', 'patient_id', 'hospital_id', 'icu_id']
-# df.drop(delist, axis=1, inplace=True)
-# for index, row in df.iterrows():
-#     icutype = row['icu_stay_type']
-#     if icutype.find('admit') == -1:
-#         df.drop(index=index, inplace=True)
-#     df = df
-# df.to_csv('./dfv01.csv')
 
-df = pd.read_csv('./dfv01.csv', index_col=0)
+std = StandardScaler()
+std = std.fit_transform(df.loc[:, df.columns != 'hospital_death'])
+attricol = ['age', 'bmi', 'elective_surgery', 'gender', 'height',
+       'pre_icu_los_days', 'weight', 'apache_2_diagnosis',
+       'apache_3j_diagnosis', 'apache_post_operative', 'arf_apache',
+       'gcs_eyes_apache', 'gcs_motor_apache', 'gcs_unable_apache',
+       'gcs_verbal_apache', 'heart_rate_apache', 'intubated_apache',
+       'map_apache', 'resprate_apache', 'temp_apache', 'ventilated_apache',
+       'd1_diasbp_max', 'd1_diasbp_min', 'd1_diasbp_noninvasive_max',
+       'd1_diasbp_noninvasive_min', 'd1_heartrate_max', 'd1_heartrate_min',
+       'd1_mbp_max', 'd1_mbp_min', 'd1_mbp_noninvasive_max',
+       'd1_mbp_noninvasive_min', 'd1_resprate_max', 'd1_resprate_min',
+       'd1_spo2_max', 'd1_spo2_min', 'd1_sysbp_max', 'd1_sysbp_min',
+       'd1_sysbp_noninvasive_max', 'd1_sysbp_noninvasive_min', 'd1_temp_max',
+       'd1_temp_min', 'h1_diasbp_max', 'h1_diasbp_min',
+       'h1_diasbp_noninvasive_max', 'h1_diasbp_noninvasive_min',
+       'h1_heartrate_max', 'h1_heartrate_min', 'h1_mbp_max', 'h1_mbp_min',
+       'h1_mbp_noninvasive_max', 'h1_mbp_noninvasive_min', 'h1_resprate_max',
+       'h1_resprate_min', 'h1_spo2_max', 'h1_spo2_min', 'h1_sysbp_max',
+       'h1_sysbp_min', 'h1_sysbp_noninvasive_max', 'h1_sysbp_noninvasive_min',
+       'd1_glucose_max', 'd1_glucose_min', 'd1_potassium_max',
+       'd1_potassium_min', 'apache_4a_hospital_death_prob',
+       'apache_4a_icu_death_prob', 'aids', 'cirrhosis', 'diabetes_mellitus',
+       'hepatic_failure', 'immunosuppression', 'leukemia', 'lymphoma',
+       'solid_tumor_with_metastasis',
+       'ethnicity_African American', 'ethnicity_Asian', 'ethnicity_Caucasian',
+       'ethnicity_Hispanic', 'ethnicity_Native American',
+       'ethnicity_Other/Unknown', 'icu_admit_source_Accident & Emergency',
+       'icu_admit_source_Floor', 'icu_admit_source_Operating Room / Recovery',
+       'icu_admit_source_Other Hospital', 'icu_admit_source_Other ICU',
+       'icu_stay_type_admit', 'icu_stay_type_readmit',
+       'icu_stay_type_transfer', 'icu_type_CCU-CTICU', 'icu_type_CSICU',
+       'icu_type_CTICU', 'icu_type_Cardiac ICU', 'icu_type_MICU',
+       'icu_type_Med-Surg ICU', 'icu_type_Neuro ICU', 'icu_type_SICU']
+std = pd.DataFrame(data=std, columns= attricol)
+final = pd.concat([std, pd.DataFrame(columns=['hospital_death'])])
+final['hospital_death'] = df['hospital_death']
 
 
 
-# df = pd.read_csv('./dataDefi2.csv', sep=";")
-# type(df.loc[:, 'bmi'][0], )
-# for i in df.columns.tolist():
-#     if type(df.loc[:, i][0]) == 'str':
-#         if df.loc[:, i][0].find(',') != -1:
-#             temp = np.array(df)[:, i].tolist()
-#             mean = np.nanmean(temp)
-#             df[np.argwhere(np.isnan(df[:, i].T)), i] = mean
-#             df[i] = df[i].str.replace(r'\b(\d+),(\d+)', r'\1.\2')
+
+
 
 # features, targets = df.loc[:, df.columns != "hospital_death"], df.loc[:, df.columns == "hospital_death"]
 #
