@@ -7,6 +7,9 @@ from sklearn import tree
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 from matplotlib import pyplot
+from sklearn.decomposition import PCA
+from dask.distributed import Client
+import joblib
 
 import os
 import os.path
@@ -101,47 +104,69 @@ for m in temp3:
 for n in temp1:
        if n not in temp2:
               tempf.append(n)
-print(tempf)
+#print(tempf)
 atopdata = atop.iloc[:, tempf]
 atoptarget = atop.loc[:, atop.columns == 'hospital_death']
 
 # -----------------------------------------------------------------------------
 
-# features, targets = df.loc[:, df.columns != "hospital_death"], df.loc[:, df.columns == "hospital_death"]
-#
-# train_features, test_features, train_targets, test_targets = train_test_split(features, targets,
-#                                                                               train_size=0.8,
-#                                                                               test_size=0.2,
-#                                                                               random_state=42,
-#                                                                               shuffle = True,
-#                                                                               stratify=targets
-# )
+## v1.0 split train set and test set
+features, targets = atopdata, atoptarget
 
-# ###### Decision Tree ######
-# model = tree.DecisionTreeClassifier(criterion='gini') # algorithm as gini or entropy
-#
-# # model = tree.DecisionTreeRegressor() for regression
-#
-# # Train the model using the training sets and check score
-# model.fit(X, y)
-# model.score(X, y)
-#
-# #Predict Output
-# predicted= model.predict(x_test)
+train_features, test_features, train_targets, test_targets = train_test_split(features, targets,
+                                                                              train_size=0.8,
+                                                                              test_size=0.2,
+                                                                              random_state=42,
+                                                                              shuffle = True,
+                                                                              stratify=targets
+)
 
-###### KNN ######
-# best_p = "" # 明科夫斯基的最佳参数
-# best_score = 0.0
-# best_k = -1
-# for k in range(1, 11):
-#     for p in range(1, 6):
-#         knn_clf = KNeighborsClassifier(n_neighbors=k, weights="distance", p=p)
-#         knn_clf.fit(train_features, train_targets)
-#         score = knn_clf.score(test_features, test_targets)
-#         if score > best_score:
-#             best_p = p
-#             best_k = k
-#             best_score = score
-# print("best_p = ", best_p)
-# print("best_k = ", best_k)
-# print("best_score = ", best_score) # 如果过大或者过小就应该适当扩大k的范围
+## v1.1 PCA
+pca = PCA(0.95)
+pca.fit(train_features)
+# print(pca.n_components_) # = 32
+
+train_features_pca = pca.transform(train_features)
+test_features_pca = pca.transform(test_features)
+
+## v1.2 DASK
+if __name__ == '__main__':
+    daskop = Client(n_workers = 4)
+    daskop
+
+
+    # ###### Decision Tree ######
+    # model = tree.DecisionTreeClassifier(criterion='gini') # algorithm as gini or entropy
+    #
+    # # model = tree.DecisionTreeRegressor() for regression
+    #
+    # # Train the model using the training sets and check score
+    # model.fit(X, y)
+    # model.score(X, y)
+    #
+    # #Predict Output
+    # predicted= model.predict(x_test)
+
+    ###### KNN ######
+    # with joblib.parallel_backend('dask'):
+    #     # best_p = "" # 明科夫斯基的最佳参数
+    #     best_score = 0.0
+    #     best_k = -1
+    #     for k in range(1, 11):
+    #     # for p in range(1, 6):
+    #         knn_clf = KNeighborsClassifier(n_neighbors=k ,weights="uniform", p=4)
+    #         knn_clf.fit(train_features_pca, train_targets)
+    #         score = knn_clf.score(test_features_pca, test_targets)
+    #         if score > best_score:
+    #             # best_p = p
+    #             best_k = k
+    #             best_score = score
+    #     # print("best_p = ", best_p)
+    #     print("best_k = ", best_k)
+    #     print("best_score = ", best_score) # 如果过大或者过小就应该适当扩大k的范围
+
+
+    # knn = KNeighborsClassifier(n_neighbors=9 ,weights="uniform", p=4)
+    # with joblib.parallel_backend('dask'):
+    #     knn.fit(train_features_pca, train_targets)
+    # print(knn.score(test_features_pca, test_targets))
