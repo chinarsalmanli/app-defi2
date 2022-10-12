@@ -13,6 +13,7 @@ import joblib
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import cross_validate, KFold
 
 import os
 import os.path
@@ -131,42 +132,43 @@ pca.fit(train_features)
 
 train_features_pca = pca.transform(train_features)
 test_features_pca = pca.transform(test_features)
+all_features_pca = pca.transform(features)
 
 ## v1.2 DASK
-if __name__ == '__main__':
-    daskop = Client(n_workers = 4)
+def daskrun(MLmethod):
+    daskop = Client(n_workers=4)
     daskop
+    with joblib.parallel_backend('dask'):
+        MLmethod.fit(train_features_pca, np.ravel(train_targets))
+    print(MLmethod.score(test_features_pca, test_targets))
+
+if __name__ == '__main__':
+    # daskop = Client(n_workers = 4)
+    # daskop
 
 
     # ###### Decision Tree ######  0.91887 0.92028
-    DT = DecisionTreeClassifier(max_depth=9, min_samples_leaf=19, min_samples_split=3, splitter='random', criterion='gini')
-    # paras = {
-    #     'criterion': ('gini', 'entropy'),
-    #     'splitter': ('best', 'random'),
-    #     'max_depth': (list(range(1,20))),
-    #     'min_samples_split': [2, 3, 4],
-    #     'min_samples_leaf': list(range(1, 20))
-    # }
-    # grid_dt = GridSearchCV(DT, paras, cv=3, scoring='accuracy', n_jobs=-1)
-    # # grid_dt = RandomizedSearchCV(DT, paras, cv=3, scoring='accuracy', n_iter=300, n_jobs=-1)
-    # grid_dt.fit(train_features_pca, np.ravel(train_targets))
-    # best_dt = grid_dt.best_estimator_
-    # print(best_dt)
-    # print(grid_dt.best_score_)
-    with joblib.parallel_backend('dask'):
-        DT.fit(train_features_pca, np.ravel(train_targets))
-    print(DT.score(test_features_pca, test_targets))
-
-    # model = tree.DecisionTreeClassifier(criterion='gini') # algorithm as gini or entropy
-    #
-    # # model = tree.DecisionTreeRegressor() for regression
-    #
-    # # Train the model using the training sets and check score
-    # model.fit(X, y)
-    # model.score(X, y)
-    #
-    # #Predict Output
-    # predicted= model.predict(x_test)
+    DT = DecisionTreeClassifier(max_depth=9,
+                                min_samples_leaf=19,
+                                min_samples_split=3,
+                                splitter='random',
+                                criterion='gini')
+    # # paras = {
+    # #     'criterion': ('gini', 'entropy'),
+    # #     'splitter': ('best', 'random'),
+    # #     'max_depth': (list(range(1,20))),
+    # #     'min_samples_split': [2, 3, 4],
+    # #     'min_samples_leaf': list(range(1, 20))
+    # # }
+    # # grid_dt = GridSearchCV(DT, paras, cv=3, scoring='accuracy', n_jobs=-1)
+    # # # grid_dt = RandomizedSearchCV(DT, paras, cv=3, scoring='accuracy', n_iter=300, n_jobs=-1)
+    # # grid_dt.fit(train_features_pca, np.ravel(train_targets))
+    # # best_dt = grid_dt.best_estimator_
+    # # print(best_dt)
+    # # print(grid_dt.best_score_)
+    # with joblib.parallel_backend('dask'):
+    #     DT.fit(train_features_pca, np.ravel(train_targets))
+    # print(DT.score(test_features_pca, test_targets))
 
     ###### KNN ######  0.9239
     # with joblib.parallel_backend('dask'):
@@ -187,7 +189,58 @@ if __name__ == '__main__':
     #     print("best_score = ", best_score) # 如果过大或者过小就应该适当扩大k的范围
 
 
-    # knn = KNeighborsClassifier(n_neighbors=9 ,weights="uniform", p=4)
+    knn = KNeighborsClassifier(n_neighbors=9 ,weights="uniform", p=4)
     # with joblib.parallel_backend('dask'):
     #     knn.fit(train_features_pca, train_targets)
     # print(knn.score(test_features_pca, test_targets))
+
+    ###### Random Forest ###### 0.925 0.927
+    RF = RandomForestClassifier(n_estimators=1500,
+                                max_features='auto',
+                                bootstrap=False,
+                                max_depth=15,
+                                min_samples_split=5,
+                                random_state=42)
+
+    # [0.25114642 0.25111627 0.24963249 0.24856861 0.24938972] 10
+    # [0.27670254 0.27184386 0.27900008 0.28094737 0.27671093]
+
+    # [0.20205957 0.20190962 0.2007799  0.20149515 0.20059125] 15
+    # [0.27262263 0.26848072 0.27506415 0.27703911 0.27407133]
+    # paras = {
+    #     # 'n_estimators': [100, 500, 1000, 1500],
+    #     'max_features': ['auto', 'sqrt', 'log2'],
+    #     'max_depth': [5, 10],
+    #     # 'min_samples_split': [2, 5, 10],
+    #     # 'min_samples_leaf': [1, 2, 4, 10],
+    #     # 'bootstrap': [True, False]
+    # }
+    # grid_rf = GridSearchCV(RF, paras, scoring='accuracy', cv=3, verbose=2, n_jobs=-1)
+    # grid_rf.fit(train_features_pca, np.ravel(train_targets))
+    # best_rf = grid_rf.best_estimator_
+    # print(best_rf)
+    # print(grid_rf.best_score_)
+
+    # with joblib.parallel_backend('dask'):
+    #     RF.fit(train_features_pca, np.ravel(train_targets))
+    # print(RF.score(test_features_pca, test_targets))
+
+    cv = KFold(n_splits=5, shuffle=True, random_state=42)  # 实例化交叉验证方式
+    # 与sklearn中其他回归算法一样，随机森林的默认评估指标是R2，
+    # 但在机器学习竞赛、甚至实际使用时，我们很少使用损失以外的指标对回归类算法进行评估。对回归类算法而言，最常见的损失就是MSE。
+    result_f = cross_validate(RF,  # 要进行交叉验证的评估器
+                              all_features_pca, np.ravel(targets),  # 数据
+                              cv=cv,  # 交叉验证模式
+                              scoring="neg_mean_squared_error",  # 评估指标
+                              return_train_score=True,  # 是否返回训练分数
+                              verbose=True,  # 是否打印进程
+                              n_jobs=-1,  # 线程数
+                              )
+    trainRMSE_f = abs(result_f["train_score"]) ** 0.5
+    testRMSE_f = abs(result_f["test_score"]) ** 0.5
+    print(trainRMSE_f)
+    print(testRMSE_f)
+
+
+
+
