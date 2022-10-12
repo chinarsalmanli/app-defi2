@@ -10,6 +10,9 @@ from matplotlib import pyplot
 from sklearn.decomposition import PCA
 from dask.distributed import Client
 import joblib
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import RandomizedSearchCV
 
 import os
 import os.path
@@ -135,7 +138,25 @@ if __name__ == '__main__':
     daskop
 
 
-    # ###### Decision Tree ######
+    # ###### Decision Tree ######  0.91887 0.92028
+    DT = DecisionTreeClassifier(max_depth=9, min_samples_leaf=19, min_samples_split=3, splitter='random', criterion='gini')
+    # paras = {
+    #     'criterion': ('gini', 'entropy'),
+    #     'splitter': ('best', 'random'),
+    #     'max_depth': (list(range(1,20))),
+    #     'min_samples_split': [2, 3, 4],
+    #     'min_samples_leaf': list(range(1, 20))
+    # }
+    # grid_dt = GridSearchCV(DT, paras, cv=3, scoring='accuracy', n_jobs=-1)
+    # # grid_dt = RandomizedSearchCV(DT, paras, cv=3, scoring='accuracy', n_iter=300, n_jobs=-1)
+    # grid_dt.fit(train_features_pca, np.ravel(train_targets))
+    # best_dt = grid_dt.best_estimator_
+    # print(best_dt)
+    # print(grid_dt.best_score_)
+    with joblib.parallel_backend('dask'):
+        DT.fit(train_features_pca, np.ravel(train_targets))
+    print(DT.score(test_features_pca, test_targets))
+
     # model = tree.DecisionTreeClassifier(criterion='gini') # algorithm as gini or entropy
     #
     # # model = tree.DecisionTreeRegressor() for regression
@@ -147,7 +168,7 @@ if __name__ == '__main__':
     # #Predict Output
     # predicted= model.predict(x_test)
 
-    ###### KNN ######
+    ###### KNN ######  0.9239
     # with joblib.parallel_backend('dask'):
     #     # best_p = "" # 明科夫斯基的最佳参数
     #     best_score = 0.0
