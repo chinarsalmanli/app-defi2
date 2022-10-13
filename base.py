@@ -4,7 +4,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn import tree
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.ensemble import RandomForestClassifier
 from matplotlib import pyplot
 from sklearn.decomposition import PCA
@@ -14,6 +14,9 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.model_selection import cross_validate, KFold
+from sklearn.svm import LinearSVC, SVC
+from sklearn.pipeline import Pipeline
+from sklearn.ensemble import VotingClassifier
 
 import os
 import os.path
@@ -153,6 +156,13 @@ if __name__ == '__main__':
                                 min_samples_split=3,
                                 splitter='random',
                                 criterion='gini')
+
+    # [0.28002739 0.27926924 0.27834374 0.27700758 0.27915865] 9
+    # [0.28468702 0.28147737 0.28839521 0.28681552 0.28596946]
+
+    # [0.27497947 0.27409688 0.27373545 0.27246006 0.27298757] 15
+    # [0.28543075 0.28447417 0.29173661 0.29339304 0.28373653]
+
     # # paras = {
     # #     'criterion': ('gini', 'entropy'),
     # #     'splitter': ('best', 'random'),
@@ -190,6 +200,9 @@ if __name__ == '__main__':
 
 
     knn = KNeighborsClassifier(n_neighbors=9 ,weights="uniform", p=4)
+
+    # [0.26989325 0.27036977 0.26851298 0.26828729 0.26899194]
+    # [0.27692137 0.27724928 0.28137828 0.28416321 0.27780335]
     # with joblib.parallel_backend('dask'):
     #     knn.fit(train_features_pca, train_targets)
     # print(knn.score(test_features_pca, test_targets))
@@ -225,21 +238,44 @@ if __name__ == '__main__':
     #     RF.fit(train_features_pca, np.ravel(train_targets))
     # print(RF.score(test_features_pca, test_targets))
 
-    cv = KFold(n_splits=5, shuffle=True, random_state=42)  # 实例化交叉验证方式
-    # 与sklearn中其他回归算法一样，随机森林的默认评估指标是R2，
-    # 但在机器学习竞赛、甚至实际使用时，我们很少使用损失以外的指标对回归类算法进行评估。对回归类算法而言，最常见的损失就是MSE。
-    result_f = cross_validate(RF,  # 要进行交叉验证的评估器
-                              all_features_pca, np.ravel(targets),  # 数据
-                              cv=cv,  # 交叉验证模式
-                              scoring="neg_mean_squared_error",  # 评估指标
-                              return_train_score=True,  # 是否返回训练分数
-                              verbose=True,  # 是否打印进程
-                              n_jobs=-1,  # 线程数
-                              )
-    trainRMSE_f = abs(result_f["train_score"]) ** 0.5
-    testRMSE_f = abs(result_f["test_score"]) ** 0.5
-    print(trainRMSE_f)
-    print(testRMSE_f)
+    ###### SVM ######
+    def PolynomialSVC(degree, C=1.0):
+        return Pipeline([
+            ("poly", PolynomialFeatures(degree=degree)),
+            ("linearSVC", LinearSVC(C=C))
+        ])
+
+
+    poly_svc = PolynomialSVC(degree=3) # 0.8617723665879218
+    kernel_poly_svc = SVC(kernel="poly", degree=3, C=1.0) # 0.9277363862135805
+    rbf_svc = SVC(kernel='rbf', gamma=1) # [0.1, 0.5, 1]
+    # daskrun(kernel_poly_svc)
+
+    ###### voting ######
+    voting = VotingClassifier(estimators=[
+        ('RandomForest', RF),
+        ('SVM', SVC(kernel="poly", degree=3, C=1.0, probability=True)),
+        ('KNN', knn)],
+        voting='soft')
+
+    # daskrun(voting)
+
+
+    # cv = KFold(n_splits=5, shuffle=True, random_state=42)  # 实例化交叉验证方式
+    # # 与sklearn中其他回归算法一样，随机森林的默认评估指标是R2，
+    # # 但在机器学习竞赛、甚至实际使用时，我们很少使用损失以外的指标对回归类算法进行评估。对回归类算法而言，最常见的损失就是MSE。
+    # result_f = cross_validate(knn,  # 要进行交叉验证的评估器
+    #                           all_features_pca, np.ravel(targets),  # 数据
+    #                           cv=cv,  # 交叉验证模式
+    #                           scoring="neg_mean_squared_error",  # 评估指标
+    #                           return_train_score=True,  # 是否返回训练分数
+    #                           verbose=True,  # 是否打印进程
+    #                           n_jobs=-1,  # 线程数
+    #                           )
+    # trainRMSE_f = abs(result_f["train_score"]) ** 0.5
+    # testRMSE_f = abs(result_f["test_score"]) ** 0.5
+    # print(trainRMSE_f)
+    # print(testRMSE_f)
 
 
 
