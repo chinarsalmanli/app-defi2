@@ -17,6 +17,8 @@ from sklearn.model_selection import cross_validate, KFold
 from sklearn.svm import LinearSVC, SVC
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import VotingClassifier
+from imblearn.under_sampling import RandomUnderSampler
+from imblearn.over_sampling import SMOTE
 
 import os
 import os.path
@@ -145,6 +147,23 @@ def daskrun(MLmethod):
         MLmethod.fit(train_features_pca, np.ravel(train_targets))
     print(MLmethod.score(test_features_pca, test_targets))
 
+## v1.3.1 undersampling
+num_train_target = train_targets.sum()
+print('样本数:{}'.format(num_train_target))
+
+# 减少第 0 类，直到第 1 类占总数的 10%
+undersample = RandomUnderSampler(sampling_strategy=0.2, random_state=42)
+train_features_pca_under, train_targets_under = undersample.fit_resample(train_features_pca, train_targets)
+print(train_features_pca_under.shape)
+
+## v1.3.2 oversampling
+oversample = SMOTE(sampling_strategy=0.2, random_state=42)
+train_features_pca_over, train_targets_over = oversample.fit_resample(train_features_pca, train_targets)
+print(train_features_pca_over.shape)
+
+
+
+## v2.0 models
 if __name__ == '__main__':
     # daskop = Client(n_workers = 4)
     # daskop
@@ -163,24 +182,34 @@ if __name__ == '__main__':
     # [0.27497947 0.27409688 0.27373545 0.27246006 0.27298757] 15
     # [0.28543075 0.28447417 0.29173661 0.29339304 0.28373653]
 
-    # # paras = {
-    # #     'criterion': ('gini', 'entropy'),
-    # #     'splitter': ('best', 'random'),
-    # #     'max_depth': (list(range(1,20))),
-    # #     'min_samples_split': [2, 3, 4],
-    # #     'min_samples_leaf': list(range(1, 20))
-    # # }
-    # # grid_dt = GridSearchCV(DT, paras, cv=3, scoring='accuracy', n_jobs=-1)
-    # # # grid_dt = RandomizedSearchCV(DT, paras, cv=3, scoring='accuracy', n_iter=300, n_jobs=-1)
-    # # grid_dt.fit(train_features_pca, np.ravel(train_targets))
-    # # best_dt = grid_dt.best_estimator_
-    # # print(best_dt)
-    # # print(grid_dt.best_score_)
+    # [0.38533483 0.40506021 0.36550308 0.40397269 0.40049536]
+    # [0.32124874 0.33217305 0.307      0.29382958 0.31039679]
+
+    tempdt =DecisionTreeClassifier(max_depth=18,
+                                   min_samples_leaf=17,
+                                   min_samples_split=3,
+                                   splitter='random',
+                                   criterion='gini')
+    # 0.4545057995634662
+    # paras = {
+    #     #'criterion': ('gini', 'entropy'),
+    #     #'splitter': ('best', 'random'),
+    #     'max_depth': (list(range(1,20))),
+    #     'min_samples_split': [2, 3, 4],
+    #     'min_samples_leaf': list(range(1, 20))
+    # }
+    # grid_dt = GridSearchCV(tempdt, paras, cv=3, scoring='f1', n_jobs=-1)
+    # # grid_dt = RandomizedSearchCV(DT, paras, cv=3, scoring='f1', n_iter=300, n_jobs=-1)
+    # grid_dt.fit(train_features_pca_under, np.ravel(train_targets_under))
+    # best_dt = grid_dt.best_estimator_
+    # print(best_dt)
+    # print(grid_dt.best_score_)
     # with joblib.parallel_backend('dask'):
-    #     DT.fit(train_features_pca, np.ravel(train_targets))
+    #     DT.fit(train_features_pca_under, np.ravel(train_targets_under))
     # print(DT.score(test_features_pca, test_targets))
 
     ###### KNN ######  0.9239
+    ############################################
     # with joblib.parallel_backend('dask'):
     #     # best_p = "" # 明科夫斯基的最佳参数
     #     best_score = 0.0
@@ -197,6 +226,25 @@ if __name__ == '__main__':
     #     # print("best_p = ", best_p)
     #     print("best_k = ", best_k)
     #     print("best_score = ", best_score) # 如果过大或者过小就应该适当扩大k的范围
+    ####################################################
+    tempknn = KNeighborsClassifier(n_neighbors=3, weights="uniform", p=2)
+    # [0.53387308 0.53406254 0.52939046 0.54362496 0.54450758] p=2
+    # [0.33065327 0.32179226 0.314      0.28658848 0.29087158]
+
+    # [0.53571429 0.53393558 0.53216304 0.5392378  0.53315902] p=4
+    # [0.31313131 0.30463576 0.30441249 0.27526663 0.28012358]
+
+    # [0.53882688 0.53663178 0.53021348 0.5466031  0.53166667] p=6
+    # [0.30463576 0.29417773 0.3047996  0.28006088 0.29028926]
+    # paras = {
+    #     'n_neighbors': (list(range(1,11))),
+    #     'p': list(range(1, 6))
+    # }
+    # grid_dt = GridSearchCV(tempknn, paras, cv=3, scoring='f1', n_jobs=-1)
+    # grid_dt.fit(train_features_pca_under, np.ravel(train_targets_under))
+    # best_dt = grid_dt.best_estimator_
+    # print(best_dt)
+    # print(grid_dt.best_score_)
 
 
     knn = KNeighborsClassifier(n_neighbors=9 ,weights="uniform", p=4)
@@ -212,7 +260,6 @@ if __name__ == '__main__':
                                 max_features='auto',
                                 bootstrap=False,
                                 max_depth=15,
-                                min_samples_split=5,
                                 random_state=42)
 
     # [0.25114642 0.25111627 0.24963249 0.24856861 0.24938972] 10
@@ -220,22 +267,27 @@ if __name__ == '__main__':
 
     # [0.20205957 0.20190962 0.2007799  0.20149515 0.20059125] 15
     # [0.27262263 0.26848072 0.27506415 0.27703911 0.27407133]
+
+    # [0.69286853 0.69402137 0.69402299 0.69356498 0.69762149]
+    # [0.31414198 0.32309443 0.31486561 0.30346344 0.30803571]
+    temprf = RandomForestClassifier(n_estimators=1500,
+                                    max_features='auto')
     # paras = {
     #     # 'n_estimators': [100, 500, 1000, 1500],
-    #     'max_features': ['auto', 'sqrt', 'log2'],
-    #     'max_depth': [5, 10],
-    #     # 'min_samples_split': [2, 5, 10],
+    #     #'max_features': ['auto', 'sqrt', 'log2'],
+    #     'max_depth': [5, 10, 15],
+    #     'min_samples_split': [2, 5, 10],
     #     # 'min_samples_leaf': [1, 2, 4, 10],
     #     # 'bootstrap': [True, False]
     # }
-    # grid_rf = GridSearchCV(RF, paras, scoring='accuracy', cv=3, verbose=2, n_jobs=-1)
-    # grid_rf.fit(train_features_pca, np.ravel(train_targets))
+    # grid_rf = GridSearchCV(temprf, paras, scoring='f1', cv=3, verbose=2, n_jobs=-1)
+    # grid_rf.fit(train_features_pca_under, np.ravel(train_targets_under))
     # best_rf = grid_rf.best_estimator_
     # print(best_rf)
     # print(grid_rf.best_score_)
 
     # with joblib.parallel_backend('dask'):
-    #     RF.fit(train_features_pca, np.ravel(train_targets))
+    #     RF.fit(train_features_pca_under, np.ravel(train_targets_under))
     # print(RF.score(test_features_pca, test_targets))
 
     ###### SVM ######
@@ -248,34 +300,43 @@ if __name__ == '__main__':
 
     poly_svc = PolynomialSVC(degree=3) # 0.8617723665879218
     kernel_poly_svc = SVC(kernel="poly", degree=3, C=1.0) # 0.9277363862135805
-    rbf_svc = SVC(kernel='rbf', gamma=1) # [0.1, 0.5, 1]
+    # [0.47889838 0.47153434 0.47305157 0.4833206  0.48824273]
+    # [0.36951983 0.36752137 0.37423935 0.35592344 0.35905512]
+    rbf_svc = SVC(kernel='rbf', gamma=0.1) # [0.1, 0.5, 1]
     # daskrun(kernel_poly_svc)
 
     ###### voting ######
     voting = VotingClassifier(estimators=[
         ('RandomForest', RF),
         ('SVM', SVC(kernel="poly", degree=3, C=1.0, probability=True)),
-        ('KNN', knn)],
+        ('KNN', tempknn)],
         voting='soft')
+
+    # [0.54848065 0.53959018 0.54336441 0.5528209  0.5572002]
+    # [0.31892195 0.30389908 0.30633609 0.2909699  0.30498866]
 
     # daskrun(voting)
 
 
-    # cv = KFold(n_splits=5, shuffle=True, random_state=42)  # 实例化交叉验证方式
-    # # 与sklearn中其他回归算法一样，随机森林的默认评估指标是R2，
-    # # 但在机器学习竞赛、甚至实际使用时，我们很少使用损失以外的指标对回归类算法进行评估。对回归类算法而言，最常见的损失就是MSE。
-    # result_f = cross_validate(knn,  # 要进行交叉验证的评估器
-    #                           all_features_pca, np.ravel(targets),  # 数据
-    #                           cv=cv,  # 交叉验证模式
-    #                           scoring="neg_mean_squared_error",  # 评估指标
-    #                           return_train_score=True,  # 是否返回训练分数
-    #                           verbose=True,  # 是否打印进程
-    #                           n_jobs=-1,  # 线程数
-    #                           )
+    cv = KFold(n_splits=5, shuffle=True, random_state=42)  # 实例化交叉验证方式
+    # 与sklearn中其他回归算法一样，随机森林的默认评估指标是R2，
+    # 但在机器学习竞赛、甚至实际使用时，我们很少使用损失以外的指标对回归类算法进行评估。对回归类算法而言，最常见的损失就是MSE。
+    result_f = cross_validate(rbf_svc,  # 要进行交叉验证的评估器
+                              all_features_pca, np.ravel(targets),  # 数据
+                              cv=cv,  # 交叉验证模式
+                              scoring="f1",  # 评估指标
+                              return_train_score=True,  # 是否返回训练分数
+                              verbose=True,  # 是否打印进程
+                              n_jobs=-1,  # 线程数
+                              )
     # trainRMSE_f = abs(result_f["train_score"]) ** 0.5
     # testRMSE_f = abs(result_f["test_score"]) ** 0.5
     # print(trainRMSE_f)
     # print(testRMSE_f)
+    trainf1 = result_f["train_score"]
+    testf1 = result_f["test_score"]
+    print(trainf1)
+    print(testf1)
 
 
 
