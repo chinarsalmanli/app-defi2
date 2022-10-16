@@ -19,6 +19,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.ensemble import VotingClassifier
 from imblearn.under_sampling import RandomUnderSampler
 from imblearn.over_sampling import SMOTE
+from sklearn.metrics import classification_report
 
 import os
 import os.path
@@ -131,9 +132,10 @@ train_features, test_features, train_targets, test_targets = train_test_split(fe
 )
 
 ## v1.1 PCA
-pca = PCA(0.95)
+pca = PCA(n_components=32)
 pca.fit(train_features)
 # print(pca.n_components_) # = 32
+# print(pca.components_)
 
 train_features_pca = pca.transform(train_features)
 test_features_pca = pca.transform(test_features)
@@ -146,6 +148,14 @@ def daskrun(MLmethod, train, test):
     with joblib.parallel_backend('dask'):
         MLmethod.fit(train, np.ravel(test))
     print(MLmethod.score(test_features_pca, test_targets))
+
+def daskreport(MLmethod, train, test):
+    daskop = Client(n_workers=4)
+    daskop
+    with joblib.parallel_backend('dask'):
+        MLmethod.fit(train, np.ravel(test))
+        predict = MLmethod.predict(test_features_pca)
+        print(classification_report(test_targets, predict))
 
 ## v1.3.1 undersampling
 num_train_target = train_targets.sum()
@@ -165,13 +175,13 @@ if __name__ == '__main__':
     # daskop = Client(n_workers = 4)
     # daskop
 
-
-    # ###### Decision Tree ######  0.91887 0.92028
-    DT = DecisionTreeClassifier(max_depth=9,
-                                min_samples_leaf=19,
-                                min_samples_split=3,
-                                splitter='random',
-                                criterion='gini')
+######################################## undersampling #############################
+    ####### Decision Tree ######  0.91887 0.92028
+    # DT = DecisionTreeClassifier(max_depth=9,
+    #                             min_samples_leaf=19,
+    #                             min_samples_split=3,
+    #                             splitter='random',
+    #                             criterion='gini')
 
     # [0.28002739 0.27926924 0.27834374 0.27700758 0.27915865] 9
     # [0.28468702 0.28147737 0.28839521 0.28681552 0.28596946]
@@ -207,7 +217,7 @@ if __name__ == '__main__':
     # print(DT.score(test_features_pca, test_targets))
 
     ###### KNN ######  0.9239
-    knn = KNeighborsClassifier(n_neighbors=9, weights="uniform", p=4)
+    # knn = KNeighborsClassifier(n_neighbors=9, weights="uniform", p=4)
 
     # with joblib.parallel_backend('dask'):
     #     knn.fit(train_features_pca, train_targets)
@@ -307,27 +317,332 @@ if __name__ == '__main__':
 
     # daskrun(voting)
 
+
+    ################################ Normal ##############################
+    """# Prediction
+    # KNN
+    """
+
+    # Import knearest neighbors Classifier model
+    from sklearn.neighbors import KNeighborsClassifier
+
+    # Create KNN Classifier
+    knn = KNeighborsClassifier(n_neighbors=8)
+
+    # Train the model using the training sets
+    knn.fit(train_features_pca, np.ravel(train_targets))
+
+    # Predict the response for test dataset
+    y_pred = knn.predict(test_features_pca)
+
+    # Import scikit-learn metrics module for accuracy calculation
+    from sklearn import metrics
+
+    # Model Accuracy, how often is the classifier correct?
+    print("Accuracy:", metrics.accuracy_score(test_targets, y_pred))
+
+    # Check the model performance
+    print(classification_report(test_targets, y_pred))
+
+    """# Gaussian Naive Bayes model"""
+
+    # Import Gaussian Naive Bayes model
+    from sklearn.naive_bayes import GaussianNB
+
+    # Create a Gaussian Classifier
+    gnb = GaussianNB()
+
+    # Train the model using the training sets
+    gnb.fit(train_features_pca, np.ravel(train_targets))
+
+    # Predict the response for test dataset
+    y_pred = gnb.predict(test_features_pca)
+
+    # Accuracy
+    print("Accuracy:", metrics.accuracy_score(test_targets, y_pred))
+
+    # Model Precision: what percentage of positive tuples are labeled as such?
+    print("Precision:", metrics.precision_score(test_targets, y_pred))
+
+    # Model Recall: what percentage of positive tuples are labelled as such?
+    print("Recall:", metrics.recall_score(test_targets, y_pred))
+
+    # Check the model performance
+    print(classification_report(test_targets, y_pred))
+
+    """# DecisionTree"""
+
+    from sklearn.tree import DecisionTreeRegressor
+
+    # Create a decision tree regression model with default arguments
+    decision_tree = DecisionTreeRegressor()
+
+    # Fit the model to the training features and targets
+    decision_tree.fit(train_features_pca, np.ravel(train_targets))
+
+    # Predict the response for test dataset
+    y_pred = decision_tree.predict(test_features_pca)
+
+    # Accuracy
+    print("Accuracy:", metrics.accuracy_score(test_targets, y_pred))
+
+    # Model Precision: what percentage of positive tuples are labeled as such?
+    print("Precision:", metrics.precision_score(test_targets, y_pred))
+
+    # Model Recall: what percentage of positive tuples are labelled as such?
+    print("Recall:", metrics.recall_score(test_targets, y_pred))
+
+    # Check the model performance
+    print(classification_report(test_targets, y_pred))
+
+    """# SVM"""
+
+    from sklearn import svm
+    from sklearn.metrics import recall_score
+    # Model and performance
+    from sklearn.svm import OneClassSVM
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import classification_report
+
+    C = 1.0  # = self._alpha in our algorithm
+
+    model1 = svm.SVC(kernel='rbf', gamma=0.7, C=C)
+
+    # Train the one class support vector machine (SVM) model
+    one_class_svm = OneClassSVM(nu=0.01, kernel='rbf', gamma='auto').fit(train_features_pca)
+
+    # Predict the anomalies
+    prediction = one_class_svm.predict(test_features_pca)
+
+    # Change the anomalies' values to make it consistent with the true values
+    prediction = [1 if i == -1 else 0 for i in prediction]
+
+    # Model Accuracy: how often is the classifier correct?
+    print("Accuracy:", metrics.accuracy_score(test_targets, prediction))
+
+    # Model Precision: what percentage of positive tuples are labeled as such?
+    print("Precision:", metrics.precision_score(test_targets, prediction))
+
+    # Model Recall: what percentage of positive tuples are labelled as such?
+    print("Recall:", metrics.recall_score(test_targets, prediction))
+
+    # Check the model performance
+    print(classification_report(test_targets, prediction))
+
+    """# #Prediction with Oversampling
+    """
+
+    ############################## oversampling ####################################
+
+    """# KNN"""
+
+    # Synthetic dataset
+    from sklearn.datasets import make_classification
+    # Model and performance
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import classification_report
+
+    # Import knearest neighbors Classifier model
+    from sklearn.neighbors import KNeighborsClassifier
+
+    # Create KNN Classifier
+    knn = KNeighborsClassifier(n_neighbors=8)
+
+    # Train the model using the training sets
+    knn.fit(train_features_pca_over, np.ravel(train_targets_over))
+
+    # Predict the response for test dataset
+    y_pred = knn.predict(test_features_pca)
+
+    # Import scikit-learn metrics module for accuracy calculation
+    from sklearn import metrics
+
+    # Model Accuracy, how often is the classifier correct?
+    print("Accuracy:", metrics.accuracy_score(test_targets, y_pred))
+
+    # Check the model performance
+    print(classification_report(test_targets, y_pred))
+
+    """# Gaussian Naive Bayes model"""
+
+    # Import Gaussian Naive Bayes model
+    from sklearn.naive_bayes import GaussianNB
+
+    # Create a Gaussian Classifier
+    gnb = GaussianNB()
+
+    # Train the model using the training sets
+    gnb.fit(train_features_pca_over, np.ravel(train_targets_over))
+
+    # Predict the response for test dataset
+    y_pred = gnb.predict(test_features_pca)
+
+    # Accuracy
+    print("Accuracy:", metrics.accuracy_score(test_targets, y_pred))
+
+    # Model Precision: what percentage of positive tuples are labeled as such?
+    print("Precision:", metrics.precision_score(test_targets, y_pred))
+
+    # Model Recall: what percentage of positive tuples are labelled as such?
+    print("Recall:", metrics.recall_score(test_targets, y_pred))
+
+    # Check the model performance
+    print(classification_report(test_targets, y_pred))
+
+    """## DecisionTreeRegressor"""
+
+    from sklearn.tree import DecisionTreeRegressor
+
+    # Create a decision tree regression model with default arguments
+    decision_tree = DecisionTreeRegressor()
+
+    # Fit the model to the training features and targets
+    decision_tree.fit(train_features_pca_over, np.ravel(train_targets_over))
+
+    # Predict the response for test dataset
+    y_pred = decision_tree.predict(test_features_pca)
+
+    # Accuracy
+    print("Accuracy:", metrics.accuracy_score(test_targets, y_pred))
+
+    # Model Precision: what percentage of positive tuples are labeled as such?
+    print("Precision:", metrics.precision_score(test_targets, y_pred))
+
+    # Model Recall: what percentage of positive tuples are labelled as such?
+    print("Recall:", metrics.recall_score(test_targets, y_pred))
+
+    # Check the model performance
+    print(classification_report(test_targets, y_pred))
+
+    """# SVM"""
+
+    from sklearn import svm
+    from sklearn.metrics import recall_score
+    # Model and performance
+    from sklearn.svm import OneClassSVM
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import classification_report
+
+    C = 1.0  # = self._alpha in our algorithm
+
+    model1 = svm.SVC(kernel='rbf', gamma=0.7, C=C)
+
+    # Train the one class support vector machine (SVM) model
+    one_class_svm = OneClassSVM(nu=0.01, kernel='rbf', gamma='auto').fit(train_features_pca_over)
+
+    # Predict the anomalies
+    prediction = one_class_svm.predict(test_features_pca)
+
+    # Change the anomalies' values to make it consistent with the true values
+    prediction = [1 if i == -1 else 0 for i in prediction]
+
+    # Model Accuracy: how often is the classifier correct?
+    print("Accuracy:", metrics.accuracy_score(test_targets, prediction))
+
+    # Model Precision: what percentage of positive tuples are labeled as such?
+    print("Precision:", metrics.precision_score(test_targets, prediction))
+
+    # Model Recall: what percentage of positive tuples are labelled as such?
+    print("Recall:", metrics.recall_score(test_targets, prediction))
+
+    # Check the model performance
+    print(classification_report(test_targets, prediction))
+
 ## v3.0 Cross Validation
-    cv = KFold(n_splits=5, shuffle=True, random_state=42)
-    stracv = StratifiedKFold(n_splits=5)
-    result_f = cross_validate(voting,
-                              all_features_pca, np.ravel(targets),
-                              cv=stracv,
-                              scoring="f1",
-                              return_train_score=True,
-                              verbose=True,
-                              n_jobs=-1,
-                              )
-    # # trainRMSE_f = abs(result_f["train_score"]) ** 0.5
-    # # testRMSE_f = abs(result_f["test_score"]) ** 0.5
-    # # print(trainRMSE_f)
-    # # print(testRMSE_f)
-    trainf1 = result_f["train_score"]
-    testf1 = result_f["test_score"]
-    print(trainf1)
-    print(testf1)
+    tempcvlist = [tempdt, tempknn, kernel_poly_svc, voting]
+    # cv = KFold(n_splits=5, shuffle=True, random_state=42)
+    # stracv = StratifiedKFold(n_splits=5)
+    # for test in tempcvlist:
+    #     result_f = cross_validate(test,
+    #                               all_features_pca, np.ravel(targets),
+    #                               cv=stracv,
+    #                               scoring="f1",
+    #                               return_train_score=True,
+    #                               verbose=True,
+    #                               n_jobs=-1,
+    #                               )
+    #     # # trainRMSE_f = abs(result_f["train_score"]) ** 0.5
+    #     # # testRMSE_f = abs(result_f["test_score"]) ** 0.5
+    #     # # print(trainRMSE_f)
+    #     # # print(testRMSE_f)
+    #     trainf1 = result_f["train_score"]
+    #     testf1 = result_f["test_score"]
+    #     print(trainf1)
+    #     print(testf1)
+    #########################################################
+    # [0.38788483 0.39237057 0.38074839 0.37142494 0.40039206] decision tree
+    # [0.30544355 0.32335329 0.31717172 0.30777096 0.32416503]
+    #
+    # [0.5439697  0.53171197 0.53607754 0.53465111 0.5334608] knn
+    # [0.29531568 0.3043257  0.31584258 0.32       0.30784913]
+    #
+    # [0.48481769 0.47914001 0.48474835 0.48296977 0.48851669] poly_svc
+    # [0.35639413 0.35852006 0.3622291  0.37319588 0.35784062]
+    #
+    # [0.44803818 0.43658765 0.44604317 0.44491751 0.45617292] voting
+    # [0.29988726 0.29904441 0.3047619  0.30880713 0.2970852]
 
 
+    # for test in tempcvlist:
+    #     daskreport(test, train_features_pca_under, train_targets_under)
 
+## v.final prediction
+    daskreport(kernel_poly_svc, train_features_pca_under, train_targets_under)
+
+    dfv = pd.read_csv('jeu2validation.csv', sep=';')
+    dfvtemp = dfv['patient_id']
+
+    dfv.drop(delist, axis=1, inplace=True)
+    dfv.drop(dummcol, axis=1, inplace=True)
+    dfv.drop('gender', axis=1, inplace=True)
+
+    for i in repvir:
+        dfv[i] = dfv[i].str.replace(',', '.').astype('float')
+
+    for j in dfv.columns.tolist():
+        dfv[j] = pd.to_numeric(dfv[j], errors='coerce')
+    for column in list(dfv.columns[dfv.isnull().sum() > 0]):
+        mean_val = dfv[column].mean()
+        dfv[column].fillna(mean_val, inplace=True)
+
+    attricolv = ['age', 'bmi', 'height', 'pre_icu_los_days', 'weight',
+                 'apache_2_diagnosis', 'apache_3j_diagnosis', 'gcs_eyes_apache',
+                 'gcs_motor_apache', 'gcs_verbal_apache', 'heart_rate_apache',
+                 'map_apache', 'resprate_apache', 'temp_apache', 'ventilated_apache',
+                 'd1_diasbp_max', 'd1_diasbp_min', 'd1_diasbp_noninvasive_max',
+                 'd1_diasbp_noninvasive_min', 'd1_heartrate_max', 'd1_heartrate_min',
+                 'd1_mbp_max', 'd1_mbp_min', 'd1_mbp_noninvasive_max',
+                 'd1_mbp_noninvasive_min', 'd1_resprate_max', 'd1_resprate_min',
+                 'd1_spo2_min', 'd1_sysbp_max', 'd1_sysbp_min',
+                 'd1_sysbp_noninvasive_max', 'd1_sysbp_noninvasive_min', 'd1_temp_max',
+                 'd1_temp_min', 'h1_diasbp_max', 'h1_diasbp_min',
+                 'h1_diasbp_noninvasive_max', 'h1_diasbp_noninvasive_min',
+                 'h1_heartrate_max', 'h1_heartrate_min', 'h1_mbp_max', 'h1_mbp_min',
+                 'h1_mbp_noninvasive_max', 'h1_mbp_noninvasive_min', 'h1_resprate_max',
+                 'h1_resprate_min', 'h1_spo2_min', 'h1_sysbp_max', 'h1_sysbp_min',
+                 'h1_sysbp_noninvasive_max', 'h1_sysbp_noninvasive_min',
+                 'd1_glucose_max', 'd1_glucose_min', 'd1_potassium_max',
+                 'd1_potassium_min', 'apache_4a_hospital_death_prob',
+                 'apache_4a_icu_death_prob']
+    # print(dfv.columns)
+    print(features.columns)
+    dfv1 = pd.DataFrame(data=dfv, columns=attricolv)
+
+    std = StandardScaler()
+    stdv = std.fit_transform(dfv1)
+    stdv = pd.DataFrame(stdv, columns=attricolv)
+
+    pca = PCA(n_components=32)
+    pca.fit(stdv)
+    print(pca.n_components_)
+    final_pca = pca.transform(stdv)
+    with joblib.parallel_backend('dask'):
+        final_pred = kernel_poly_svc.predict(final_pca)
+
+    finaldf = pd.DataFrame(final_pred, columns=['Prediction'])
+    final = pd.concat([finaldf, pd.DataFrame(columns=['patient_id'])])
+    final['patient_id'] = dfvtemp
+
+    final.to_csv('./Groupe3_Chinar_Salmanli.csv', sep=';', index=None)
 
 
